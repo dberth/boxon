@@ -13,6 +13,7 @@ let view = Box2.v P2.o (Size2.v page_width page_height)
 let debug_pt pt = Printf.eprintf "(%.2f,%.2f)\n%!" (P2.x pt) (P2.y pt)
 let debug_v vec =Printf.eprintf "(%.2f,%.2f)\n%!" (V2.x vec) (V2.y vec)
 
+let font = Font.{name = "DejaVu Sans"; slant= `Normal; weight = `W800; size = 5.}
     
 let tuck pt1 pt2 end_pt path =
   let open P in
@@ -51,6 +52,7 @@ let mk_box
     ~depth
     ~lid_back
     ~lid_front
+    ~color
     =
   let path =
     let open P in
@@ -93,7 +95,7 @@ let mk_box
     tuck (v 0. depth) (v (-. width) 0.) (v 0. (-. depth)) >>
     tuck (v 0. depth) (v (-. depth) 0.) (v 0. (-. depth))
   in
-  I.const (Color.v_srgb 0. 0. 0.)
+  I.const color
     >> I.cut ~area: (`O {P.o with P.width = 0.1}) path
 
 
@@ -102,33 +104,40 @@ let mk_inset ~width ~height ~depth ~lid_back =
   let open P2 in
   let path =
     let rel = true in
-    sub (v (page_width -. 10.) (page_height -. 10.)) empty >>
-    line ~rel (v  (-. (depth +. width /. 5.)) 0.) >>
+    sub (v (page_width -. 10.) (page_height -. 10. -. lid_back)) empty >>
+    line ~rel (v (-.depth) lid_back) >>
+    line ~rel (v  (-. (width /. 5.)) 0.) >>
     line ~rel (v (-. width /. 5.) (-. lid_back)) >>
     line ~rel (v (-. width /. 5.) 0.) >>
     line ~rel (v (-. width /. 5.) lid_back) >>
-    line ~rel (v (-. (depth +. width /. 5.)) 0.) >>
-    line ~rel (v 0. (-. height)) >>
+    line ~rel (v (-. (width /. 5.)) 0.) >>
+    line ~rel (v (-. depth) (-. lid_back)) >>
+    line ~rel (v 0. (-. height +. lid_back)) >>
     line ~rel (v (2. *. depth +. width) 0.) >>
-    line ~rel (v 0. height) >>
-    sub ~rel (v (-. depth) 0.) >>
+    line ~rel (v 0. (height -. lid_back)) >>
+    sub ~rel (v (-. depth) lid_back) >>
     line ~rel (v 0. (-. height)) >>
     sub ~rel (v (-. width) 0.) >>
     line ~rel (v 0. height)
   in
-  I.const (Color.v_srgb 0. 0. 0.)
+  I.const (Color.gray 0.8)
     >> I.cut ~area: (`O {P.o with P.width = 0.1; join =`Round}) path
-  
 
+let flip image =
+  let matrix =
+    M3.v
+      (-1.) 0. page_width
+      0. 1. 0.
+      0. 0. 1.
+  in
+  I.tr matrix image
+
+
+    
 (* 2. Render *)
 
-let () =
-  let width = 62. in
-  let height = 89. in
-  let depth = 12. in
-  let lid_back = 10. in
-  let lid_front = 25. in
-  let box = mk_box ~width ~height ~depth ~lid_back ~lid_front in
+let render_box ~width ~height ~depth ~lid_back ~lid_front =
+  let box color = mk_box ~width ~height ~depth ~lid_back ~lid_front ~color in
   let inset = mk_inset ~width: (width -. 0.5) ~height: (height -. 3.) ~depth: (depth -. 1.5) ~lid_back: (lid_back -. 3.) in
   
   let title = "Lid box template" in
@@ -136,11 +145,35 @@ let () =
   let xmp = Vgr.xmp ~title ~description () in
   let warn w = Vgr.pp_warning Format.err_formatter w in
   let r = Vgr.create ~warn (Vgr_pdf.target ~xmp ()) (`Channel stdout) in
-  if 5. *. depth +. 3. *. width < page_width -. 20. then
-    let image = I.blend box inset in
+  if 5. *. depth +. 3. *. width < page_width -. 20. ||
+  2. *. depth +. 2. *. height < page_height -. 20. then
+    let image = I.blend (box Color.(gray 0.8)) inset in
     ignore (Vgr.render r (`Image (size, view, image)));
   else begin
-    ignore (Vgr.render r (`Image (size, view, box)));
+    ignore (Vgr.render r (`Image (size, view, box (Color.gray 0.8))));
     ignore (Vgr.render r (`Image (size, view, inset)))
   end;
+  if false then ignore (Vgr.render r (`Image (size, view, flip (box (Color.gray 0.8)))));
   ignore (Vgr.render r `End)
+
+type card_descr =
+    {
+     width: float;
+     height: float;
+     thickness: float;
+   }
+
+let xwing_small_card = {width = 41.; height = 62.; thickness = 0.3}
+
+let xwing_card = {width = 62.; height = 88.; thickness = 0.3}
+
+let render_card_box {width; height; thickness} nb_of_cards =
+  render_box
+    ~width: (width +. 1.)
+    ~height: (height +. 2.)
+    ~depth: (thickness *. (float nb_of_cards) +. 1.)
+    ~lid_back: 10.
+    ~lid_front: 25.
+    
+let () =
+  render_card_box xwing_card 45
