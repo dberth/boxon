@@ -167,6 +167,8 @@ let xwing_small_card = {width = 41.; height = 62.; thickness = 0.3}
 
 let xwing_card = {width = 62.; height = 88.; thickness = 0.3}
 
+let sleeved_card = {width = 66.; height = 92.; thickness = 0.6}
+
 let render_card_box {width; height; thickness} nb_of_cards =
   render_box
     ~width: (width +. 1.)
@@ -176,4 +178,4 @@ let render_card_box {width; height; thickness} nb_of_cards =
     ~lid_front: 25.
     
 let () =
-  render_card_box xwing_card 45
+  render_card_box xwing_card 57
