@@ -136,7 +136,15 @@ let flip image =
     
 (* 2. Render *)
 
-let render_box ~width ~height ~depth ~lid_back ~lid_front =
+let render_svg ~xmp ~warn image =
+  let buf = Buffer.create 4 in
+  let r = Vgr.create ~warn (Vgr_svg.target ~xmp ()) (`Buffer buf) in
+  ignore (Vgr.render r (`Image image));
+  ignore (Vgr.render r `End);
+  Buffer.contents buf
+  
+
+let render_box_pages ~width ~height ~depth ~lid_back ~lid_front =
   let box color = mk_box ~width ~height ~depth ~lid_back ~lid_front ~color in
   let inset = mk_inset ~width: (width -. 0.5) ~height: (height -. 3.) ~depth: (depth -. 1.5) ~lid_back: (lid_back -. 3.) in
   
@@ -144,17 +152,29 @@ let render_box ~width ~height ~depth ~lid_back ~lid_front =
   let description = "Lid box template" in
   let xmp = Vgr.xmp ~title ~description () in
   let warn w = Vgr.pp_warning Format.err_formatter w in
-  let r = Vgr.create ~warn (Vgr_pdf.target ~xmp ()) (`Channel stdout) in
   if 5. *. depth +. 3. *. width < page_width -. 20. ||
   2. *. depth +. 2. *. height < page_height -. 20. then
-    let image = I.blend (box Color.(gray 0.8)) inset in
-    ignore (Vgr.render r (`Image (size, view, image)));
-  else begin
-    ignore (Vgr.render r (`Image (size, view, box (Color.gray 0.8))));
-    ignore (Vgr.render r (`Image (size, view, inset)))
-  end;
-  if false then ignore (Vgr.render r (`Image (size, view, flip (box (Color.gray 0.8)))));
-  ignore (Vgr.render r `End)
+    let image = I.blend (box Color.(gray 0.8)) inset in  
+    [render_svg ~xmp ~warn (size, view, image)]
+  else
+    [
+      (render_svg ~xmp ~warn (size, view, box (Color.gray 0.8)));
+      (render_svg ~xmp ~warn (size, view, inset));
+    ]
+
+let render_html ~width ~height ~depth ~lid_back ~lid_front =
+  let svgs = render_box_pages ~width ~height ~depth ~lid_back  ~lid_front in
+  String.concat "\n"
+  ([
+    "<html>";
+    "  <body>"
+  ]
+  @ svgs @
+  [
+    "  </body>";
+    "</html>"
+  ])
+  |> print_endline
 
 type card_descr =
     {
@@ -172,7 +192,7 @@ let sleeved_card = {width = 66.; height = 92.; thickness = 0.6}
 let render_card_box ?(landscape = false) {width; height; thickness} nb_of_cards =
 let width = if landscape then height else width in
 let height = if landscape then width else height in
-  render_box
+  render_html
     ~width: (width +. 1.)
     ~height: (height +. 2.)
     ~depth: (thickness *. (float nb_of_cards) +. 1.)
@@ -180,4 +200,4 @@ let height = if landscape then width else height in
     ~lid_front: 25.
     
 let () =
-  render_card_box ~landscape: true xwing_card 94
+  render_card_box xwing_card 50
