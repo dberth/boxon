@@ -93,6 +93,7 @@ OCAMLPACKS[] =
     vg
     vg.pdf
     vg.svg
+    base64
 
 if $(not $(OCAMLFIND_EXISTS))
     eprintln(This project requires ocamlfind, but is was not found.)

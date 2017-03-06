@@ -136,9 +136,9 @@ let flip image =
     
 (* 2. Render *)
 
-let render_svg ~xmp ~warn image =
+let render_svg ~warn image =
   let buf = Buffer.create 4 in
-  let r = Vgr.create ~warn (Vgr_svg.target ~xmp ()) (`Buffer buf) in
+  let r = Vgr.create ~warn (Vgr_svg.target ()) (`Buffer buf) in
   ignore (Vgr.render r (`Image image));
   ignore (Vgr.render r `End);
   Buffer.contents buf
@@ -147,29 +147,31 @@ let render_svg ~xmp ~warn image =
 let render_box_pages ~width ~height ~depth ~lid_back ~lid_front =
   let box color = mk_box ~width ~height ~depth ~lid_back ~lid_front ~color in
   let inset = mk_inset ~width: (width -. 0.5) ~height: (height -. 3.) ~depth: (depth -. 1.5) ~lid_back: (lid_back -. 3.) in
-  
-  let title = "Lid box template" in
-  let description = "Lid box template" in
-  let xmp = Vgr.xmp ~title ~description () in
   let warn w = Vgr.pp_warning Format.err_formatter w in
   if 5. *. depth +. 3. *. width < page_width -. 20. ||
   2. *. depth +. 2. *. height < page_height -. 20. then
     let image = I.blend (box Color.(gray 0.8)) inset in  
-    [render_svg ~xmp ~warn (size, view, image)]
+    [render_svg ~warn (size, view, image)]
   else
     [
-      (render_svg ~xmp ~warn (size, view, box (Color.gray 0.8)));
-      (render_svg ~xmp ~warn (size, view, inset));
+      (render_svg ~warn (size, view, box (Color.gray 0.8)));
+      (render_svg ~warn (size, view, inset));
     ]
 
 let render_html ~width ~height ~depth ~lid_back ~lid_front =
   let svgs = render_box_pages ~width ~height ~depth ~lid_back  ~lid_front in
+  let imgs =
+    let base64 s = B64.(encode s) in
+    List.map (fun svg -> Printf.sprintf "<img src=\"data:image/svg+xml;base64,%s\" />" (base64 svg)) svgs
+  in
   String.concat "\n"
   ([
-    "<html>";
-    "  <body>"
+    "<!DOCTYPE html>";
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
+    "<html xmlns:l=\"http://www.w3.org/1999/xlink\">";
+    "  <body>";
   ]
-  @ svgs @
+  @ imgs @
   [
     "  </body>";
     "</html>"
